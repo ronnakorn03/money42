@@ -68,10 +68,19 @@
             margin: 25px 0 10px;
         }
         .admin-link a {
-            color: #3498db;
+            display: inline-block;
+            margin: 6px;
+            padding: 10px 20px;
+            border-radius: 6px;
             text-decoration: none;
-            font-weight: 600;
+            font-weight: bold;
+            color: white;
+            transition: background-color 0.3s;
         }
+        .admin-link a.login { background-color: #0984e3; }
+        .admin-link a.signup { background-color: #00b894; }
+        .admin-link a.admin { background-color: #e17055; }
+        .admin-link a:hover { opacity: 0.85; }
     </style>
 </head>
 <body>
@@ -88,7 +97,9 @@
         <ul id="unpaidList" class="unpaid"></ul>
 
         <div class="admin-link">
-            <a href="admin.html">สำหรับผู้ดูแลระบบ</a>
+            <a href="login.html" class="login">เข้าสู่ระบบ</a>
+            <a href="signup.html" class="signup">สมัครสมาชิก</a>
+            <a href="admin.html" class="admin">สำหรับผู้ดูแลระบบ</a>
         </div>
     </div>
 
@@ -134,7 +145,7 @@
             allTimeUserTotals.set(payment.nickname, currentTotal + (payment.amount || 0));
           });
 
-          // เช็กว่าจ่ายวันนี้หรือยัง (รองรับทั้ง string และ Timestamp)
+          // เช็กว่าจ่ายวันนี้หรือยัง
           const todayPayments = allPaymentsData.filter(p => {
             if (p.date && typeof p.date.toDate === "function") {
               return p.date.toDate().toISOString().slice(0, 10) === today;
