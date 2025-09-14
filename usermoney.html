@@ -93,81 +93,93 @@
     </div>
 
     <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, getDocs, query, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getFirestore, collection, getDocs, query, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyDaLJdQQEd52KHInDDLQZHYa2RiBhnGJGA",
-    authDomain: "money42-75681.firebaseapp.com",
-    projectId: "money42-75681",
-    storageBucket: "money42-75681.firebasestorage.app",
-    messagingSenderId: "336738230000",
-    appId: "1:336738230000:web:3d48bc3fc0d4dee1f5ac35",
-    measurementId: "G-1SGQMMDNX9"
-  };
+      const firebaseConfig = {
+        apiKey: "AIzaSyDaLJdQQEd52KHInDDLQZHYa2RiBhnGJGA",
+        authDomain: "money42-75681.firebaseapp.com",
+        projectId: "money42-75681",
+        storageBucket: "money42-75681.firebasestorage.app",
+        messagingSenderId: "336738230000",
+        appId: "1:336738230000:web:3d48bc3fc0d4dee1f5ac35",
+        measurementId: "G-1SGQMMDNX9"
+      };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
 
-  const paidList = document.getElementById('paidList');
-  const unpaidList = document.getElementById('unpaidList');
-  const todayDateEl = document.getElementById('todayDate');
-  const totalAllTimeEl = document.getElementById('totalAllTime');
+      const paidList = document.getElementById('paidList');
+      const unpaidList = document.getElementById('unpaidList');
+      const todayDateEl = document.getElementById('todayDate');
+      const totalAllTimeEl = document.getElementById('totalAllTime');
 
-  function setupPublicViewListener() {
-    const today = new Date().toISOString().slice(0, 10);
-    todayDateEl.textContent = `ประจำวันที่ ${today}`;
+      function setupPublicViewListener() {
+        const today = new Date().toISOString().slice(0, 10);
+        todayDateEl.textContent = `ประจำวันที่ ${today}`;
 
-    const allPaymentsQuery = query(collection(db, "payments"));
+        const allPaymentsQuery = query(collection(db, "payments"));
 
-    onSnapshot(allPaymentsQuery, async (paymentSnapshot) => {
-      const allPaymentsData = paymentSnapshot.docs.map(doc => doc.data());
+        onSnapshot(allPaymentsQuery, async (paymentSnapshot) => {
+          const allPaymentsData = paymentSnapshot.docs.map(doc => doc.data());
 
-      const grandTotalAmount = allPaymentsData.reduce((sum, payment) => sum + payment.amount, 0);
-      totalAllTimeEl.textContent = `ยอดรวมทั้งหมด: ${grandTotalAmount.toLocaleString('th-TH')} บาท`;
+          // รวมยอดทั้งหมด
+          const grandTotalAmount = allPaymentsData.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+          totalAllTimeEl.textContent = `ยอดรวมทั้งหมด: ${grandTotalAmount.toLocaleString('th-TH')} บาท`;
 
-      const allTimeUserTotals = new Map();
-      allPaymentsData.forEach(payment => {
-        const currentTotal = allTimeUserTotals.get(payment.nickname) || 0;
-        allTimeUserTotals.set(payment.nickname, currentTotal + payment.amount);
-      });
+          // รวมยอดตามชื่อ
+          const allTimeUserTotals = new Map();
+          allPaymentsData.forEach(payment => {
+            const currentTotal = allTimeUserTotals.get(payment.nickname) || 0;
+            allTimeUserTotals.set(payment.nickname, currentTotal + (payment.amount || 0));
+          });
 
-      const todayPayments = allPaymentsData.filter(p => p.date === today);
-      const paidNicknamesForToday = new Set(todayPayments.map(p => p.nickname));
+          // เช็กว่าจ่ายวันนี้หรือยัง (รองรับทั้ง string และ Timestamp)
+          const todayPayments = allPaymentsData.filter(p => {
+            if (p.date && typeof p.date.toDate === "function") {
+              return p.date.toDate().toISOString().slice(0, 10) === today;
+            }
+            return p.date === today;
+          });
 
-      const userSnapshot = await getDocs(collection(db, "users"));
-      const allNicknames = userSnapshot.docs.map(doc => doc.data().nickname).filter(Boolean).sort((a, b) => a.localeCompare(b, 'th'));
+          const paidNicknamesForToday = new Set(todayPayments.map(p => p.nickname));
 
-      paidList.innerHTML = "";
-      unpaidList.innerHTML = "";
+          const userSnapshot = await getDocs(collection(db, "users"));
+          const allNicknames = userSnapshot.docs
+            .map(doc => doc.data().nickname)
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b, 'th'));
 
-      if (allNicknames.length === 0) {
-        unpaidList.innerHTML = "<li>ยังไม่มีข้อมูลผู้ใช้ในระบบ</li>";
-        return;
+          paidList.innerHTML = "";
+          unpaidList.innerHTML = "";
+
+          if (allNicknames.length === 0) {
+            unpaidList.innerHTML = "<li>ยังไม่มีข้อมูลผู้ใช้ในระบบ</li>";
+            return;
+          }
+
+          allNicknames.forEach(nickname => {
+            const li = document.createElement("li");
+            if (paidNicknamesForToday.has(nickname)) {
+              const totalAmountPaid = allTimeUserTotals.get(nickname) || 0;
+              li.textContent = `${nickname} (ยอดรวม: ${totalAmountPaid.toLocaleString('th-TH')} บาท)`;
+              paidList.appendChild(li);
+            } else {
+              li.textContent = nickname;
+              unpaidList.appendChild(li);
+            }
+          });
+
+          if (paidList.children.length === 0) {
+            paidList.innerHTML = "<li>ยังไม่มีผู้จ่าย</li>";
+          }
+        }, (error) => {
+          unpaidList.innerHTML = "<li>เกิดข้อผิดพลาดในการโหลดข้อมูล</li>";
+          console.error(error);
+        });
       }
 
-      allNicknames.forEach(nickname => {
-        const li = document.createElement("li");
-        if (paidNicknamesForToday.has(nickname)) {
-          const totalAmountPaid = allTimeUserTotals.get(nickname) || 0;
-          li.textContent = `${nickname} (ยอดรวม: ${totalAmountPaid.toLocaleString('th-TH')} บาท)`;
-          paidList.appendChild(li);
-        } else {
-          li.textContent = nickname;
-          unpaidList.appendChild(li);
-        }
-      });
-
-      if (paidList.children.length === 0) {
-        paidList.innerHTML = "<li>ยังไม่มีผู้จ่าย</li>";
-      }
-    }, (error) => {
-      unpaidList.innerHTML = "<li>เกิดข้อผิดพลาดในการโหลดข้อมูล</li>";
-    });
-  }
-    </script>
-    <script>
-      // เรียกใช้งานฟังก์ชันทันทีที่หน้าโหลดเสร็จ
+      // เรียกฟังก์ชัน
       setupPublicViewListener();
     </script>
 </body>
